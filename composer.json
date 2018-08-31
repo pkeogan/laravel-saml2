@@ -17,13 +17,13 @@
     },
     "autoload": {
         "psr-4": {
-            "KingStarter\\LaravelSaml\\": "src"
+            "Pkeogan\\LaravelSaml\\": "src"
         }
     },
     "extra": {
         "laravel": {
           "providers": [
-            "KingStarter\\LaravelSaml\\LaravelSamlServiceProvider"
+            "Pkeogan\\LaravelSaml\\LaravelSamlServiceProvider"
           ]
         }
     }

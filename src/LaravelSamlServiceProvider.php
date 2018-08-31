@@ -1,12 +1,12 @@
 <?php
 
-namespace KingStarter\LaravelSaml;
+namespace Pkeogan\LaravelSaml;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Foundation\Application as LaravelApplication;
 use Config;
-use KingStarter\LaravelSaml\Console\EncodeAssertionUrlCommand;
-use KingStarter\LaravelSaml\Console\SamlSetupCommand;
+use Pkeogan\LaravelSaml\Console\EncodeAssertionUrlCommand;
+use Pkeogan\LaravelSaml\Console\SamlSetupCommand;
 
 class LaravelSamlServiceProvider extends ServiceProvider
 {

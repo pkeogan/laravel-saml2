@@ -1,6 +1,6 @@
 <?php
 
-namespace KingStarter\LaravelSaml\Console;
+namespace Pkeogan\LaravelSaml\Console;
 
 use App\Http\Middleware\SamlAuth;
 use function GuzzleHttp\Psr7\str;
