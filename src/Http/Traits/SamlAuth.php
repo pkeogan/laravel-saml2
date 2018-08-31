@@ -1,6 +1,6 @@
 <?php
 
-namespace KingStarter\LaravelSaml\Http\Traits;
+namespace Pkeogan\LaravelSaml\Http\Traits;
 
 use LightSaml\Credential\KeyHelper;
 use Storage;

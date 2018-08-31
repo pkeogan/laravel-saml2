@@ -1,6 +1,6 @@
 <?php
 
-namespace KingStarter\LaravelSaml\Http\Traits;
+namespace Pkeogan\LaravelSaml\Http\Traits;
 
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Foundation\Auth\RedirectsUsers;
@@ -8,7 +8,7 @@ use Illuminate\Foundation\Auth\ThrottlesLogins;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
-use KingStarter\LaravelSaml\Http\Traits\SamlAuth;
+use Pkeogan\LaravelSaml\Http\Traits\SamlAuth;
 
 trait SamlAuthenticatesUsers
 {
