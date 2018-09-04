@@ -1,3 +1,5 @@
+#this is a fork from kingstart/laravel-saml and pcable/laravel-saml
+
 # Laravel SAML
 
 Laravel-SAML implements a SAML2 IDP plugin to transform laravel into a SAML identity provider (IDP) beside the regular authentication. The package is designed to work with Laravel 5.4 or above.
