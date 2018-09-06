@@ -7,13 +7,18 @@ use Storage;
 use Illuminate\Http\Request;
 use LightSaml\Model\Protocol\Response as Response;
 use LightSaml\Credential\X509Certificate;
+use LightSaml\Meta\TrustOptions\TrustOptions;
+use LightSaml\Validator\Model\Statement\StatementValidator;
 
 // For debug purposes, include the Log facade
 use Illuminate\Support\Facades\Log;
+use RobRichards\XMLSecLibs\XMLSecurityKey;
+use RobRichards\XMLSecLibs\XMLSecurityDSig;
+
 
 trait SamlAuth
 {
-
+//TrustOptions::setSignatureDigestAlgorithm(XMLSecurityKey::RSA_SHA256);
     /*
     |--------------------------------------------------------------------------
     | File handling (metadata, certificates)
@@ -130,7 +135,9 @@ trait SamlAuth
         $x509 = new X509Certificate();
         $certificate = $x509->loadPem($this->certfile());
         // Load in keyfile content (last parameter determines of the first one is a file or its content)
-        $privateKey = \LightSaml\Credential\KeyHelper::createPrivateKey($this->keyfile(), '', false);
+				//dd($this->keyfile());
+        $privateKey = \LightSaml\Credential\KeyHelper::createPrivateKey($this->keyfile(), '', false, XMLSecurityKey::RSA_SHA256);
+			//dd($privateKey->loadKey);
 
         if (config('saml.debug_saml_request')) {
             Log::debug('<SamlAuth::buildSAMLResponse>');
@@ -139,6 +146,7 @@ trait SamlAuth
             Log::debug('Destination: ' . $destination);
             Log::debug('Issuer: ' . $issuer);
             Log::debug('Certificate: ' . $this->certfile());
+			Log::debug('Key: ' . $this->keyfile());
             Log::debug('SAMLRequest:' . $request->get('SAMLRequest'));
         }
 
@@ -151,11 +159,18 @@ trait SamlAuth
             $x509 = new X509Certificate();
             $spCert = $x509->setData($sp['certificate']);
         }
+		
+
+		
         if($spCert && !$authnRequest->getSignature()->validate(KeyHelper::createPublicKey($spCert))){
             Log::error("Invalid signature for URL $url. SAMLRequest=" . $request->get('SAMLRequest'));
             throw new \Exception("Invalid signature for URL $url.");
         }
 
+	
+		
+		
+  
         // Generate the response object
         $response = new \LightSaml\Model\Protocol\Response();
         $response
@@ -165,7 +180,7 @@ trait SamlAuth
             ->setDestination($destination)
             ->setIssuer(new \LightSaml\Model\Assertion\Issuer($issuer))
             ->setStatus(new \LightSaml\Model\Protocol\Status(new \LightSaml\Model\Protocol\StatusCode(\LightSaml\SamlConstants::STATUS_SUCCESS)))
-            ->setSignature(new \LightSaml\Model\XmlDSig\SignatureWriter($certificate, $privateKey))
+            ->setSignature(new \LightSaml\Model\XmlDSig\SignatureWriter($certificate, $privateKey, XMLSecurityDSig::SHA256))
         ;
 
         $this->addRelayStateToResponse($response);
@@ -177,6 +192,9 @@ trait SamlAuth
             $user  = \Auth::user();
             $email = $user->email;
             $name  = $user->name;
+			$first_name = $user->first_name; 
+			$last_name = $user->last_name; 
+
             if (config('saml.forward_roles'))
                 $roles = $user->roles->pluck('name')->all();
         }else {
@@ -202,7 +220,7 @@ trait SamlAuth
                             ->setSubjectConfirmationData(
                                 (new \LightSaml\Model\Assertion\SubjectConfirmationData())
                                     ->setInResponseTo($authnRequest->getId())
-                                    ->setNotOnOrAfter(new \DateTime('+1 MINUTE'))
+                                    ->setNotOnOrAfter(new \DateTime('+100 MINUTE'))
                                     ->setRecipient($authnRequest->getAssertionConsumerServiceURL())
                             )
                     )
@@ -210,7 +228,7 @@ trait SamlAuth
             ->setConditions(
                 (new \LightSaml\Model\Assertion\Conditions())
                     ->setNotBefore(new \DateTime())
-                    ->setNotOnOrAfter(new \DateTime('+1 MINUTE'))
+                    ->setNotOnOrAfter(new \DateTime('+100 MINUTE'))
                     ->addItem(
                         new \LightSaml\Model\Assertion\AudienceRestriction([
                             $audienceRestriction
@@ -220,27 +238,32 @@ trait SamlAuth
             ->addItem(
                 (new \LightSaml\Model\Assertion\AttributeStatement())
                     ->addAttribute(new \LightSaml\Model\Assertion\Attribute(
-                        \LightSaml\ClaimTypes::EMAIL_ADDRESS,
+                        'email',
                         $email
                     ))
                     ->addAttribute(new \LightSaml\Model\Assertion\Attribute(
-                        \LightSaml\ClaimTypes::COMMON_NAME,
-                        $name
+                        'first_name',
+                        $first_name
+                    ))
+					->addAttribute(new \LightSaml\Model\Assertion\Attribute(
+                        'last_name',
+                        $last_name
                     ))
                     ->addAttribute(new \LightSaml\Model\Assertion\Attribute(
-                        \LightSaml\ClaimTypes::ROLE,
+                        'roles',
                         $roles
                     ))
             )
             ->addItem(
                 (new \LightSaml\Model\Assertion\AuthnStatement())
-                    ->setAuthnInstant(new \DateTime('-10 MINUTE'))
+                    ->setAuthnInstant(new \DateTime('-100 MINUTE'))
                     ->setSessionIndex('_some_session_index')
                     ->setAuthnContext(
                         (new \LightSaml\Model\Assertion\AuthnContext())
                             ->setAuthnContextClassRef(\LightSaml\SamlConstants::AUTHN_CONTEXT_PASSWORD_PROTECTED_TRANSPORT)
                     )
             )
+			->setSignature(new \LightSaml\Model\XmlDSig\SignatureWriter($certificate, $privateKey, XMLSecurityDSig::SHA256))
         ;
 
         // Send out the saml response
@@ -271,7 +294,7 @@ trait SamlAuth
                 Log::debug("SAMLResponse: Couldn't extract the response");
             }
         }
-
+		
         print $httpResponse->getContent()."\n\n";
     }
 
