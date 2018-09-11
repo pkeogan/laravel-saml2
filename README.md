@@ -1,10 +1,13 @@
-#this is a fork from kingstart/laravel-saml and pcable/laravel-saml
+# Still working on the documentation, this package is currently working with the features listed below
 
-# Laravel SAML
+# Laravel SAML2
 
-Laravel-SAML implements a SAML2 IDP plugin to transform laravel into a SAML identity provider (IDP) beside the regular authentication. The package is designed to work with Laravel 5.4 or above.
-
-The package is based on [Dustin Parham's guide to implement a SAML IDP with laravel](https://imbringingsyntaxback.com/implementing-a-saml-idp-with-laravel/). To get a better basic understanding for SAML in general, read [Cheung's SAML for Web Developers](https://github.com/jch/saml).
+This repo was orginaly a fork of kingstarter/laravel-saml. It has since grown from that, and is now gives any laravel applcation the following abilites:
+1 - Become a IDP
+2 - Generate certs for signing messages, signing assertions and encryppting attributes. These certs use data inputed from the config file
+3 - Configure attributes to be sent (From Config File)
+4 - Configure for each SP if the message and/or assertion should be signed
+5 - Provides the ability on the logout page to logout of any of the service provides via iframe
 
 ## Installation
 
@@ -13,18 +16,14 @@ The package is based on [Dustin Parham's guide to implement a SAML IDP with lara
 Using ```composer```: 
 
 ``` 
-composer require "kingstarter/laravel-saml":"dev-master"
+composer require "pkeogan/laravel-saml2":"dev-master"
 ```
-
-#### Lightsaml dependency problem
-
-In case you run in a current lightsaml dependency problem regarding symfony 4 (event dispatcher) you might consider [using a fork of lightsaml allowing to use symfony 4](https://github.com/kingstarter/laravel-saml/issues/8#issuecomment-366991715).
 
 #### Laravel 5.4
 Add the service provider to ```config/app.php```
 
 ```
-    KingStarter\LaravelSaml\LaravelSamlServiceProvider::class,
+    Pkeogan\LaravelSaml\LaravelSamlServiceProvider::class,
 ```
 #### Laravel 5.5+
 This package supports Laravel's Package Auto Discovery and should be automatically loaded when required using composer. If the package is not auto discovered run
@@ -57,28 +56,16 @@ Within ```config/filesystem.php``` following entry needs to be added:
     ],
 ```
 
-#### Setting the entity id
-
-In config/saml.php set the field idp.entity-id to your entity id. This is normally a uri, the uri doesn't need to exist, it just needs to be unique
-
-    'idp' => [
-        .....
-        'entityId' => 'http://idp.wherever.com'
-    ],
+#### Fill out the config file 
+ WIP 
     
 #### Generating metadata and certificates
 
-There is a sample metadata template in storage/saml/idp/metadata.blade.php, This was generated using https://www.samltool.com/idp_metadata.php
-
-Edit this template to customize it for your site.
-
-When you're finished run the following command to generate certificates and the metadata file 
+Once the config is filled out correcly, run the command below to generate the metadata and the cert. Please note, if no certs are located the system will generate them. If you would like to overide the certs, please use the ``--cert`` flag
 
 ```
-php artisan laravel-saml:generate-meta --cert
+php artisan laravel-saml:generate-meta
 ```
-
-To use exisiting certificates just make sure they're present in the saml drive then run the command without the --cert option
 
 #### SAML SP entries
 
@@ -110,9 +97,14 @@ Within your login view, problably ```resources/views/auth/login.blade.php``` add
     {{-- The hidden CSRF field for secure authentication --}}
     {{ csrf_field() }}
     {{-- Add a hidden SAML Request field for SAML authentication --}}
-    @if(isset($_GET['SAMLRequest']))
+ 	@if(isset($_GET['SAMLRequest']))
         <input type="hidden" id="SAMLRequest" name="SAMLRequest" value="{{ $_GET['SAMLRequest'] }}">
+    @elseif(isset($saml))
+        <input type="hidden" id="SAMLRequest" name="SAMLRequest" value="{{ $saml }}">
     @endif
+    @if( config('saml.logout_apps_via_iframe') && session('samlLogout') ) 
+	  	@include('saml::logout')
+  	@endif
 ```
 
 The SAMLRequest field will be filled automatically when a SAMLRequest is sent by a http request and therefore initiate a SAML authentication attempt.
@@ -127,7 +119,21 @@ class LoginController extends Controller
 {
 ...
 
-    use SamlAuthenticatesUsers; 
+      /**
+     * The user has been authenticated.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed  $user
+     * @return mixed
+     */
+    protected function authenticated(Request $request, $user)
+    {
+        if(Auth::check() && isset($request['SAMLRequest'])) {
+            $this->handleSamlLoginRequest($request);
+        }
+
+        return redirect()->intended($this->redirectPath());
+    }
 
 .....
 ```
@@ -141,13 +147,15 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Support\Facades\Auth;
-
-use KingStarter\LaravelSaml\Http\Traits\SamlAuth;
+use Illuminate\Support\Facades\Session;
+use Pkeogan\LaravelSaml\Http\Traits\SamlAuth;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class RedirectIfAuthenticated
 {
-    use SamlAuth;
-    
+        use SamlAuth;
+
     /**
      * Handle an incoming request.
      *
@@ -156,13 +164,15 @@ class RedirectIfAuthenticated
      * @param  string|null  $guard
      * @return mixed
      */
-    public function handle($request, Closure $next, $guard = null)
+    public function handle(Request $request, Closure $next, $guard = null)
     {
-        if(Auth::check() && isset($request['SAMLRequest'])){  
-            $this->handleSamlLoginRequest($request);
-        }
-        if (Auth::guard($guard)->check()) {
-            return redirect('/home');
+		if(Auth::check() && isset($request['SAMLRequest'])){
+            $saml = $this->handleSamlLoginRequest($request);
+			return new Response(view('saml::post')->withSaml($saml));
+        } 
+		
+        if(Auth::guard($guard)->check() && !isset($request['SAMLRequest']) ) {
+            return redirect('/');
         }
         return $next($request);
     }
@@ -192,7 +202,7 @@ class VerifyCsrfToken extends Middleware
      * @var array
      */
     protected $except = [
-        '/postLogin'
+       'login/saml', 'logout/saml'
     ];
 }
 
