@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\Storage;
 use neilherbertuk\modules\Traits\MakeController;
 use neilherbertuk\modules\Traits\MakeModule;
 use neilherbertuk\modules\Traits\MakeRoutes;
+use LightSaml\Credential\X509Certificate;
+
+use RobRichards\XMLSecLibs\XMLSecurityKey; //https://github.com/robrichards/xmlseclibs/blob/master/src/XMLSecurityKey.php
+use RobRichards\XMLSecLibs\XMLSecurityDSig; //https://github.com/robrichards/xmlseclibs/blob/master/src/XMLSecurityDSig.php
+
 
 class SamlSetupCommand extends Command
 {
@@ -51,38 +56,98 @@ class SamlSetupCommand extends Command
         }catch(\InvalidArgumentException $ex){
             throw new \Exception('saml disk not configured in config/filesystems.php');
         }
+		
 
-        $this->generateCertificate();
+		$this->generateCertificate();			
         $this->generateMetadata();
+		if(config('saml.metadata.sign_metadata')){
+			$this->signMetadata();
+		}
+		
     }
 
     protected function generateCertificate()
     {
-        $keyfile = Storage::disk('saml')->path(config('saml.idp.key'));
-        $certfile = Storage::disk('saml')->path(config('saml.idp.cert'));
-        $days = $this->options()['cert-days'];
+		//gerneate the openssl.cnf file, and save it
+		Storage::disk('saml')->put(config('saml.openssl_config_location'), $this->arr2ini(config('saml.openssl_config')));
+		$config = Storage::disk('saml')->path(config('saml.openssl_config_location'));
+		$first = false;
+		$m_first = false;
+		//check if the cert and key exist, if they dont make a blank file so we can create it
+		if(!Storage::disk('saml')->exists(config('saml.metadata.cert'))){
+			Storage::disk('saml')->put(config('saml.metadata.cert'), '');
+			$first = true;
+		} 
+		if(!Storage::disk('saml')->exists(config('saml.metadata.key'))) {
+			$first = true;
+			Storage::disk('saml')->put(config('saml.metadata.key'), '');
+		}
+		$certfile = Storage::disk('saml')->path(config('saml.metadata.cert'));
+		$keyfile = Storage::disk('saml')->path(config('saml.metadata.key'));
 
-        if($this->options()['cert'] || !file_exists($keyfile) || !file_exists($certfile)){
+		//check if we are going to sign the metadata, if so, lets make the blank ones
+		if(config('saml.metadata.sign_metadata')){
+			//overwrtie old certs and make them blank
+			if(!Storage::disk('saml')->exists(config('saml.metadata.sign_metadata_cert'))) {
+				Storage::disk('saml')->put(config('saml.metadata.sign_metadata_cert'), '');
+				$m_first = true;
+			}
+			if(!Storage::disk('saml')->exists(config('saml.metadata.sign_metadata_key'))) {
+				Storage::disk('saml')->put(config('saml.metadata.sign_metadata_key'), '');
+				$m_first = true;
+			}
+			$m_certfile = Storage::disk('saml')->path(config('saml.metadata.sign_metadata_cert'));
+			$m_keyfile = Storage::disk('saml')->path(config('saml.metadata.sign_metadata_key'));
+		}
+			
+
+        if($this->options()['cert'] || $first){
+
             $output = [];
             $ret = 0;
-            exec("openssl req -newkey rsa:2048 -nodes -x509 -days $days -out $certfile -keyout $keyfile ",
+            exec("openssl req -new -x509 -config $config -out $certfile -keyout $keyfile ",
                 $output,$ret );
             if($ret == 0){
-                $this->info("Certificate Generated");
+                $this->info("IDP Certificate Generated");
             }else{
                 $this->error("Failed to generate certificate\n". implode("\n", $output));
             }
         }
+		
+		//if we are signing meta data, then lets make the certs now
+		if(config('saml.metadata.sign_metadata')){
+			if($this->options()['cert'] || $m_first){
+				$output = [];
+				$ret = 0;
+				exec("openssl req -new -x509 -config $config -out $m_certfile -keyout $m_keyfile ",
+					$output,$ret );
+				if($ret == 0){
+					$this->info("Metadata Certificate Generated");
+				}else{
+					$this->error("Failed to generate certificate\n". implode("\n", $output));
+				}
+			}
+		}
+		
+		if(!$this->options()['cert'] && !$first && !$m_first)
+		{
+			$this->info("No Certificates Generated, use the --cert flag to overwrite the old ones");
+		}
+		
 
     }
 
     protected function generateMetadata()
     {
-        $metadataFile = Storage::disk('saml')->path(config('saml.idp.metadata'));
+		
+
+		
+		//create the metadata file
+        $metadataFile = Storage::disk('saml')->path(config('saml.metadata.location'));
         $file = pathinfo($metadataFile);
         $blade = $file['dirname'].'/'.$file['filename'].'.blade.php';
 
-        $certificate = file_get_contents( Storage::disk('saml')->path(config('saml.idp.cert')));
+        $certificate = file_get_contents( Storage::disk('saml')->path(config('saml.metadata.cert')));
         $certificate = preg_replace('/-----.*CERTIFICATE-----/', '', $certificate);
         $certificate = str_replace("\n","", $certificate);
 
@@ -95,8 +160,43 @@ class SamlSetupCommand extends Command
             throw new \Exception("File $blade doesn't exist");
         }
 
-        $this->info("$metadataFile generated");
+        $this->info("metadata generated");
     }
+	
+	private function signMetadata()
+	{
+
+		// Load in both certificate and keyfile
+        // The files are stored within a private storage path, this prevents from
+        // making them accessible from outside  
+        $x509 = new X509Certificate();
+        $certificate = $x509->loadPem(Storage::disk('saml')->get(config('saml.metadata.sign_metadata_cert')));
+        // Load in keyfile content (last parameter determines of the first one is a file or its content)
+				//dd($this->keyfile());
+        $privateKey = \LightSaml\Credential\KeyHelper::createPrivateKey(Storage::disk('saml')->path(config('saml.metadata.sign_metadata_key')), 
+																		config('saml.metadata.sign_metadata_key_passphrase'), 
+																		true, 
+																		XMLSecurityKey::RSA_SHA256);
+		
+		$signature = new \LightSaml\Model\XmlDSig\SignatureWriter($certificate, $privateKey, XMLSecurityDSig::SHA256);
+		
+		$metadataFile = Storage::disk('saml')->path(config('saml.metadata.location'));
+        $file = pathinfo($metadataFile);
+
+		
+		$metadata = \LightSaml\Model\Metadata\Metadata::fromFile($metadataFile);
+		
+		$metadata->setSignature($signature);
+		
+		$serializationContext = new \LightSaml\Model\Context\SerializationContext();
+		
+		$metadata->serialize($serializationContext->getDocument(), $serializationContext);
+		
+		
+		Storage::disk('saml')->put(config('saml.metadata.location'), $serializationContext->getDocument()->saveXML());
+
+		 $this->info("metadata signed");
+	}
 
     public function bladeRender($value, array $args = array())
     {
@@ -123,5 +223,30 @@ class SamlSetupCommand extends Command
 
         return $content;
     }
+	
+	function arr2ini(array $a, array $parent = array())
+	{
+		$out = '';
+		foreach ($a as $k => $v)
+		{
+			if (is_array($v))
+			{
+				//subsection case
+				//merge all the sections into one array...
+				$sec = array_merge((array) $parent, (array) $k);
+				//add section information to the output
+				$out .= '[' . join('.', $sec) . ']' . PHP_EOL;
+				//recursively traverse deeper
+				$out .= $this->arr2ini($v, $sec);
+			}
+			else
+			{
+				//plain key->value case
+				$out .= "$k=$v" . PHP_EOL;
+			}
+		}
+		return $out;
+	}
+
 
 }

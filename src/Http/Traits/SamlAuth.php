@@ -9,7 +9,7 @@ use LightSaml\Model\Protocol\Response as Response;
 use LightSaml\Credential\X509Certificate;
 use LightSaml\Meta\TrustOptions\TrustOptions;
 use LightSaml\Validator\Model\Statement\StatementValidator;
-
+use Illuminate\Support\Facades\Auth;
 // For debug purposes, include the Log facade
 use Illuminate\Support\Facades\Log;
 use RobRichards\XMLSecLibs\XMLSecurityKey;
@@ -84,6 +84,7 @@ trait SamlAuth
         // Store RelayState to session if provided
         if(!empty($request->input('RelayState'))){
             session()->put('RelayState', $request->input('RelayState'));
+			
         }
         // Handle SamlRequest if provided, otherwise just exit
         if (isset($request->SAMLRequest)) {
@@ -97,7 +98,7 @@ trait SamlAuth
             $authnRequest = new \LightSaml\Model\Protocol\AuthnRequest();
             $authnRequest->deserialize($deserializationContext->getDocument()->firstChild, $deserializationContext);
             // Generate the saml response (saml authentication attempt)
-            $this->buildSamlResponse($authnRequest, $request);
+            return $this->buildSamlResponse($authnRequest, $request);
         }
     }
 
@@ -120,14 +121,27 @@ trait SamlAuth
         if(!$sp){
             $sp = config('saml.sp.' . base64_encode($url));
             if(!$sp){
-                throw new \Exception("Invalid SAML Consumer $url");
+                throw new \Exception("Invalid SAML Consumer Url");
             }
         }
+		if(Auth::check())
+		{
+			$user  = \Auth::user();
+		} else {
+		    throw new \Exception("User attempting SAML is not logged in");
+		}
+		
+		if( isset($sp['permission_needed']) ){		
+			if( !$user->can($sp['permission_needed']) )
+			{
+				throw new \Exception("You do not have the needed permission to use this Service Provider.");
+			}}
         $destination = isset($sp['destination']) ? $sp['destination'] : $url;
         $issuer = isset($sp['issuer']) ? $sp['issuer'] : config('saml.idp.entityId');
         $audienceRestriction = $url;
         if(isset($sp['entity-id'])) $audienceRestriction = $sp['entity-id'];
         if(isset($sp['audience_restriction'])) $audienceRestriction = $sp['audience_restriction'];
+
 
         // Load in both certificate and keyfile
         // The files are stored within a private storage path, this prevents from
@@ -180,27 +194,37 @@ trait SamlAuth
             ->setDestination($destination)
             ->setIssuer(new \LightSaml\Model\Assertion\Issuer($issuer))
             ->setStatus(new \LightSaml\Model\Protocol\Status(new \LightSaml\Model\Protocol\StatusCode(\LightSaml\SamlConstants::STATUS_SUCCESS)))
-            ->setSignature(new \LightSaml\Model\XmlDSig\SignatureWriter($certificate, $privateKey, XMLSecurityDSig::SHA256))
         ;
+		
+		//sign the response message if the config for this SP is set as such
+		if(isset($sp['sign_message']) && $sp['sign_message']) 
+		{
+			$response->setSignature(new \LightSaml\Model\XmlDSig\SignatureWriter($certificate, $privateKey, $sp['sign_message']));
+		}
 
         $this->addRelayStateToResponse($response);
 
-        // We are responding with both the email and the username as attributes
-        // TODO: Add here other attributes, e.g. groups / roles / permissions
-        $roles = array();
-        if(\Auth::check()){
-            $user  = \Auth::user();
-            $email = $user->email;
-            $name  = $user->name;
-			$first_name = $user->first_name; 
-			$last_name = $user->last_name; 
-
-            if (config('saml.forward_roles'))
-                $roles = $user->roles->pluck('name')->all();
-        }else {
-            $email = $request['email'];
-            $name  = 'Place Holder';
-        }        
+		//generate attributes
+		$attributes = new \LightSaml\Model\Assertion\AttributeStatement();
+		foreach(config('saml.attributes') as $key=>$value)
+		{
+			$attributes->addAttribute(new \LightSaml\Model\Assertion\Attribute($key, $user[$value]));
+		}
+		
+		
+		if(isset($sp['nameID_format']))
+		{
+			$format = $sp['nameID_value'];
+		} else {
+			$format = 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress';
+		}
+		
+		if(isset($sp['nameID_value']))
+		{
+			$nameID =  \Auth::user()[$sp['nameID_value']];
+		} else {
+			$nameID = \Auth::user()['email'];
+		}
         
         // Generate the SAML assertion for the response xml object
         $assertion
@@ -211,8 +235,8 @@ trait SamlAuth
             ->setSubject(
                 (new \LightSaml\Model\Assertion\Subject())
                     ->setNameID(new \LightSaml\Model\Assertion\NameID(
-                        $email,
-                        \LightSaml\SamlConstants::NAME_ID_FORMAT_EMAIL
+                        $nameID,
+                        $format
                     ))
                     ->addSubjectConfirmation(
                         (new \LightSaml\Model\Assertion\SubjectConfirmation())
@@ -235,25 +259,7 @@ trait SamlAuth
                         ])
                     )
             )
-            ->addItem(
-                (new \LightSaml\Model\Assertion\AttributeStatement())
-                    ->addAttribute(new \LightSaml\Model\Assertion\Attribute(
-                        'email',
-                        $email
-                    ))
-                    ->addAttribute(new \LightSaml\Model\Assertion\Attribute(
-                        'first_name',
-                        $first_name
-                    ))
-					->addAttribute(new \LightSaml\Model\Assertion\Attribute(
-                        'last_name',
-                        $last_name
-                    ))
-                    ->addAttribute(new \LightSaml\Model\Assertion\Attribute(
-                        'roles',
-                        $roles
-                    ))
-            )
+            ->addItem($attributes)
             ->addItem(
                 (new \LightSaml\Model\Assertion\AuthnStatement())
                     ->setAuthnInstant(new \DateTime('-100 MINUTE'))
@@ -263,40 +269,27 @@ trait SamlAuth
                             ->setAuthnContextClassRef(\LightSaml\SamlConstants::AUTHN_CONTEXT_PASSWORD_PROTECTED_TRANSPORT)
                     )
             )
-			->setSignature(new \LightSaml\Model\XmlDSig\SignatureWriter($certificate, $privateKey, XMLSecurityDSig::SHA256))
         ;
-
-        // Send out the saml response
-        $this->sendSamlResponse($response);
-    }
-
-    /**
-     * Send saml response object (print out)
-     *
-     * @param  \LightSaml\Model\Protocol\Response  $response
-     * @return \Illuminate\Http\RedirectResponse
-     */
-    protected function sendSamlResponse(Response $response)
-    {
-        $bindingFactory = new \LightSaml\Binding\BindingFactory();
-        $postBinding = $bindingFactory->create(\LightSaml\SamlConstants::BINDING_SAML2_HTTP_POST);
-        $messageContext = new \LightSaml\Context\Profile\MessageContext();
-        $messageContext->setMessage($response)->asResponse();
-        /** @var \Symfony\Component\HttpFoundation\Response $httpResponse */
-        $httpResponse = $postBinding->send($messageContext);
-
-        if (config('saml.debug_saml_request')) {
-            $matches = [];
-            preg_match('/name="SAMLResponse" value="([^"]*)"/', $httpResponse->getContent(), $matches);
-            if($matches && $matches[1]){
-                Log::debug('SAMLResponse: '. $matches[1]);
-            }else{
-                Log::debug("SAMLResponse: Couldn't extract the response");
-            }
-        }
 		
-        print $httpResponse->getContent()."\n\n";
+
+		if(isset($sp['sign_assertion']) && $sp['sign_assertion']) 
+		{
+			$assertion->setSignature(new \LightSaml\Model\XmlDSig\SignatureWriter($certificate, $privateKey, $sp['sign_assertion']));
+		}
+
+
+		$serializationContext = new \LightSaml\Model\Context\SerializationContext();
+
+		$response->serialize($serializationContext->getDocument(), $serializationContext);
+		
+		
+	//$serializationContext->getDocument()->saveXML()
+			
+		$response = $serializationContext->getDocument()->saveXML();
+		return ['response' => base64_encode($response), 'recipient' => base64_encode($url), 'relayState' => $request->input('RelayState') ];
+
     }
+
 
     /**
      * @param $response
