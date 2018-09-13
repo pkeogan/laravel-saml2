@@ -5,7 +5,7 @@
  */
 
 Route::group([
-        'namespace' => '\Pkeogan\LaravelSaml\Http\Controllers',
+        'namespace' => "Pkeogan\LaravelSaml\Http\Controllers",
 	'middleware' => 'web'
 
     ], function () {

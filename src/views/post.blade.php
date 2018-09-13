@@ -1,103 +1,94 @@
-
-<!DOCTYPE html>
-<html>
-
-<head>
-  <meta charset="utf-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="csrf-token" content="obJGAQZXYFUUqA3J4o8SwV04tHylIEVyyDcAzFuJ">
-  <meta name="description" content="Applcation Made By Peter Keogan">
-  <meta name="author" content="Peter Keogan">
-  <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
-   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=pgqRLGNB2R">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=pgqRLGNB2R">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=pgqRLGNB2R">
-<link rel="manifest" href="/site.webmanifest?v=pgqRLGNB2R">
-<link rel="mask-icon" href="/safari-pinned-tab.svg?v=pgqRLGNB2R" color="#4e342e">
-<link rel="shortcut icon" href="/favicon.ico?v=pgqRLGNB2R">
-<meta name="msapplication-TileColor" content="#4e342e">
-<meta name="msapplication-TileImage" content="/mstile-144x144.png?v=pgqRLGNB2R">
-<meta name="theme-color" content="#4e342e">  
-      <title>Hennepin EMS | SAML Auto Login</title>
-      <!-- Import Styles -->
-  <link media="all" type="text/css" rel="stylesheet" href="https://hennepinems.org/css/style.css">
-
-
-  <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
-  <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
-  <!--[if lt IE 9]>
-  <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
-  <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
-  <![endif]-->
-
-  <!-- Google Font -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700,300italic,400italic,600italic"> 
-  <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.1.1/css/all.css" integrity="sha384-xyMU7RufUdPGVOZRrc2z2nRWVWBONzqa0NFctWglHmt5q5ukL22+lvHAqhqsIm3h" crossorigin="anonymous">
-
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="SAML Post Page">
+    <meta name="author" content="Peter Keogan">
+    <title>SAML Post</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha256-eSi1q2PG6J7g7ib17yAaWMcrr5GrtohYChqibrV7PBE=" crossorigin="anonymous" />
 	<style>
+	html,
 	body {
-	background: linear-gradient(
-      rgba(0, 0, 0, 0.45), 
-      rgba(0, 0, 0, 0.45)
-    ), url('https://hennepinems.org/images/login-bg.jpg') no-repeat center center fixed !important;
-    -webkit-background-size: cover !important;
-    -moz-background-size: cover !important;
-    -o-background-size: cover !important;
-    background-size: cover !important;
-		background-color: #000;
-		color: #fff !important;
-}
-		.login-logo-light {
-			color: #fff !important;
-		}
+		height: 100%;
+	}
+		
+	.footer-text {
+		font-size: 12px;
+		color: #cdcdcd;
+	}
+
+	body {
+		display: -ms-flexbox;
+		display: -webkit-box;
+		display: flex;
+		-ms-flex-align: center;
+		-ms-flex-pack: center;
+		-webkit-box-align: center;
+		align-items: center;
+		-webkit-box-pack: center;
+		justify-content: center;
+		padding-top: 40px;
+		padding-bottom: 40px;
+		background-color: #f5f5f5;
+	}
+
+	.form-signin {
+		width: 100%;
+		max-width: 330px;
+		padding: 15px;
+		margin: 0 auto;
+	}
+
+	.form-signin .checkbox {
+		font-weight: 400;
+	}
+
+	.form-signin .form-control {
+		position: relative;
+		box-sizing: border-box;
+		height: auto;
+		padding: 10px;
+		font-size: 16px;
+	}
+
+	.form-signin .form-control:focus {
+		z-index: 2;
+	}
+
+	.form-signin input[type="email"] {
+		margin-bottom: -1px;
+		border-bottom-right-radius: 0;
+		border-bottom-left-radius: 0;
+	}
+
+	.form-signin input[type="password"] {
+		margin-bottom: 10px;
+		border-top-left-radius: 0;
+		border-top-right-radius: 0;
+	}
 	</style>
-</head>
-<!-- ADD THE CLASS layout-top-nav TO REMOVE THE SIDEBAR. -->
-
-<body onload="document.form.submit()" class="hold-transition login-page">
-
-  <div class="login-box">
-  <div class="login-logo">
-	  <img src="https://hennepinems.org/images/hems-patch-login.png" class="center-block" alt="HEMS Patch">
-
-    <a href="https://hennepinems.org" class="login-logo-light"><b>Hennepin</b> EMS</a>
-  </div>
-  <!-- /.login-logo -->
-    	   	    
-
-  <div class="login-box-body">
-    <p class="login-box-msg"> Since your browser does not support JavaScript, you must
-            press the button below once to proceed.</p>
-    <form method="POST" name="form" action="{{ base64_decode($saml['recipient']) }}" accept-charset="UTF-8" class="form-horizontal">
- 	            <input type="hidden" name="SAMLResponse" value="{{ $saml['response'] }}" />
- 	            @if(isset($saml['relayState']))<input type="hidden" name="RelayState" value="{{ $saml['relayState'] }}" />@endif
-                    <div class="row form-group">
-                     <div class="col-sm-12">
-						 	<input class="btn btn-block btn-primary" type="submit" value="Proceed">
-                        </div><!--col-md-10-->
-	 				 </div>
-
-      </form>
-
-      </div>
-  <!-- /.login-box-body -->
-  </br>
-      <p class="login-box-msg"> PLASMA <a class="login-logo-light" href="https://hennepinems.org">Verison 0.1A </a></p>
-</div>
-<!-- /.login-box -->
-    
-      <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
-
-    <!-- Import Scripts (build in webpack.min.js -->
-<script type="text/javascript" src="https://cdn.datatables.net/v/bs/jszip-2.5.0/dt-1.10.16/b-1.5.1/b-colvis-1.5.1/b-flash-1.5.1/b-html5-1.5.1/b-print-1.5.1/r-2.2.1/datatables.min.js"></script>
-  <script src="https://hennepinems.org/js/scripts.js"></script>
-
-
-           <script>
-     $(document).ready(function() {
-               });
-  </script>
-  
-</body>
-
+  </head>
+  <body @if(config('saml.post.auto', true))onload="document.form.submit()"@endif class="text-center">
+    <form method="POST" name="form" action="{{ base64_decode($saml['recipient']) }}" accept-charset="UTF-8" class="form-signin">
+		<h1>Logging into {{ $saml['name'] }}</h1>
+		@if(config('saml.post.auto', true))
+		<div class="alert alert-info" role="alert">
+		  {{ config('saml.post.message', 'Your browser be automatically logging you in just a moment. If you are not redirected, please click the button below.') }}
+		</div>
+		@else
+		<div class="alert alert-info" role="alert">
+			Please click the button below to proceed.
+		</div>
+		@endif
+		<input type="hidden" name="SAMLResponse" value="{{ $saml['response'] }}" /> 
+		@if(isset($saml['relayState']))
+		<input type="hidden" name="RelayState" value="{{ $saml['relayState'] }}" />
+		@endif
+      <button class="btn btn-lg btn-primary btn-block" type="submit">Proceed</button>
+		</br>
+	 	 {!! config('saml.post.footer') !!}
+    </form>
+  </body>
 </html>

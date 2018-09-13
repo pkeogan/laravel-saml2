@@ -27,8 +27,7 @@ class SamlIdpController extends Controller
     }
 	public function post(Request $request) 
 	{
-		dd( $request->session()->all() );
-        return view('saml::post');
+        return view(config('saml.post.view', 'saml::post'));
     }
 	
 	public function logoutAll(Request $request)

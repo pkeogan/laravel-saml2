@@ -223,5 +223,22 @@ return [
 		'roles' => 'roles_for_saml',
 
     ],
+	
+	/*
+    |--------------------------------------------------------------------------
+    | Post Page Settings
+    |--------------------------------------------------------------------------
+    |
+    | the post settings control the post page. This page is used when sending requests to the Service provider. This ppage loads the SAMLResponse, then posts it to the SP consume url.
+    |
+    */
+	
+	'post' => [
+		'view' => 'saml::post', //you can overide the deault view that comes with the package here
+		'message' => 'You will be automatically logged in just a moment. If you are not, please click the button below.',
+		'auto' => true, //if true, on doc load javascipt will post the form automaticly, if false user will have to click the button manually.
+		'footer' => "<a class='footer-text' href='https://github.com/pkeogan/laravel-saml2'>pkeogan/laravel-saml2</a>" // remember to give this package a Star or contribute if you have ideas or find problems. just remove this if you dont want it
+    ],
+
 
 ];

@@ -214,7 +214,7 @@ trait SamlAuth
 		
 		if(isset($sp['nameID_format']))
 		{
-			$format = $sp['nameID_value'];
+			$format = $sp['nameID_format'];
 		} else {
 			$format = 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress';
 		}
@@ -282,11 +282,13 @@ trait SamlAuth
 
 		$response->serialize($serializationContext->getDocument(), $serializationContext);
 		
-		
-	//$serializationContext->getDocument()->saveXML()
+
 			
 		$response = $serializationContext->getDocument()->saveXML();
-		return ['response' => base64_encode($response), 'recipient' => base64_encode($url), 'relayState' => $request->input('RelayState') ];
+		return ['response'   => base64_encode($response),
+				'recipient'  => base64_encode($url),
+				'relayState' => $request->input('RelayState'),
+				'name'       => $sp['name'] ];
 
     }
 
