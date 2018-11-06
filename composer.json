@@ -2,8 +2,8 @@
     "name": "pkeogan/laravel-saml2",
     "description": "SAML support to make a laravel application to both a SAML IDP and a SAML SP.",
     "keywords": ["laravel", "saml", "illuminate", "auth", "acl", "login", "sso", "idp", "sp"],
+    "version": "1.0",
     "license": "MIT",
-    "version": "dev-master",
     "authors": [
         {
             "name": "Steve Hegenbart",
