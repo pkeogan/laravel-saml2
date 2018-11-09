@@ -1,6 +1,4 @@
-# Still working on the documentation, this package is currently working with the features listed below
-
-# Laravel SAML2
+# Larvael + SAML2 Goodness
 
 This repo was orginaly a fork of kingstarter/laravel-saml. It has since grown from that, and is now gives any laravel applcation the following abilites:
 1 - Become a IDP
@@ -8,6 +6,8 @@ This repo was orginaly a fork of kingstarter/laravel-saml. It has since grown fr
 3 - Configure attributes to be sent (From Config File)
 4 - Configure for each SP if the message and/or assertion should be signed
 5 - Provides the ability on the logout page to logout of any of the service provides via iframe
+
+This package makes it so easy to matinin and a IDP. Docs need a little work, if your willing to help let me know.
 
 ## Installation
 
