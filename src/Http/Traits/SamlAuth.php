@@ -208,7 +208,11 @@ trait SamlAuth
 		$attributes = new \LightSaml\Model\Assertion\AttributeStatement();
 		foreach(config('saml.attributes') as $key=>$value)
 		{
-			$attributes->addAttribute(new \LightSaml\Model\Assertion\Attribute($key, $user[$value]));
+			if($key == 'email'){
+				$attributes->addAttribute(new \LightSaml\Model\Assertion\Attribute($key, strtolower($user[$value]) ));
+			} else {
+				$attributes->addAttribute(new \LightSaml\Model\Assertion\Attribute($key, $user[$value]));
+			}
 		}
 		
 		
@@ -223,7 +227,7 @@ trait SamlAuth
 		{
 			$nameID =  \Auth::user()[$sp['nameID_value']];
 		} else {
-			$nameID = \Auth::user()['email'];
+			$nameID = strtolower(\Auth::user()['email']);
 		}
         
         // Generate the SAML assertion for the response xml object
